@@ -5,17 +5,22 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Физмат — образ жизни</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
+        :root {
+            --bg1: #0f172a;
+            --bg2: #0b1220;
+        }
+
+        html,
         body {
+            height: 100%;
             margin: 0;
-            font-family: Inter, sans-serif;
-            background: linear-gradient(135deg, #0f172a, #0b1220);
-            color: #fff;
+            font-family: Inter, system-ui, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
-            height: 100vh;
+            background: linear-gradient(135deg, var(--bg1), var(--bg2));
+            color: #fff;
             overflow: hidden;
         }
 
@@ -26,22 +31,41 @@
             border-radius: 18px;
             box-shadow: 0 10px 40px rgba(2, 6, 23, .6);
             overflow: hidden;
-            background: rgba(255, 255, 255, 0.03);
         }
 
-        .section {
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .greet,
+        .final,
+        .cards {
             position: absolute;
             inset: 0;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            transition: opacity 0.8s;
+            z-index: 2;
+            transition: opacity 1s ease;
+        }
+
+        .greet {
+            opacity: 1;
+        }
+
+        .final,
+        .cards {
             opacity: 0;
             pointer-events: none;
         }
 
-        .section.active {
+        .active {
             opacity: 1;
             pointer-events: auto;
         }
@@ -49,33 +73,80 @@
         .greet img {
             max-width: 70%;
             height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, .5);
         }
 
-        button {
+        .greet button,
+        .final button {
             margin-top: 20px;
             padding: 12px 34px;
             font-size: 18px;
+            font-weight: 600;
             color: #fff;
             background: linear-gradient(90deg, #4b6cb7, #182848);
             border: none;
             border-radius: 10px;
             cursor: pointer;
             box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
+            transition: opacity .5s ease, transform .3s;
+        }
+
+        .greet button:hover,
+        .final button:hover {
+            transform: scale(1.05);
+        }
+
+        .final h2 {
+            font-size: clamp(20px, 4vw, 40px);
+            margin-bottom: 20px;
+            text-align: center;
+            animation: fadeIn 1.5s ease-out forwards;
+        }
+
+        .final img {
+            max-width: 80%;
+            max-height: 60vh;
+            object-fit: contain;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, .5);
+            animation: fadeIn 2s ease-out 0.5s forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .cards {
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
             text-align: center;
-            padding: 20px;
         }
 
         .card {
-            font-size: 20px;
+            font-size: clamp(18px, 2.5vw, 26px);
             background: rgba(255, 255, 255, 0.1);
-            padding: 30px;
+            padding: 30px 40px;
             border-radius: 12px;
             max-width: 80%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, .4);
             backdrop-filter: blur(8px);
-            margin-bottom: 20px;
+            min-height: 150px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.3s ease;
         }
 
         .card-nav {
@@ -83,142 +154,228 @@
             gap: 20px;
         }
 
-        .add-section {
-            margin-top: 20px;
+        .card-nav button {
+            padding: 10px 28px;
+            font-size: 16px;
+            color: #fff;
+            background: linear-gradient(90deg, #4b6cb7, #182848);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: .3s;
         }
 
-        textarea {
+        .card-nav button:hover {
+            transform: scale(1.05);
+        }
+
+        /* ===== форма добавления ===== */
+        #addForm {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 20px;
+            border-radius: 12px;
+        }
+
+        #newText {
             width: 300px;
-            height: 80px;
-            padding: 10px;
-            border-radius: 8px;
+            max-width: 80%;
+            height: 100px;
+            border-radius: 10px;
             border: none;
+            padding: 10px;
+            font-size: 16px;
             resize: none;
+        }
+
+        #saveText {
+            background: linear-gradient(90deg, #4b6cb7, #182848);
+            border: none;
+            color: white;
+            padding: 10px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        #saveText:hover {
+            transform: scale(1.05);
         }
     </style>
 </head>
 
 <body>
-    <div class="stage">
+    <div class="stage" id="stage">
+        <canvas id="c"></canvas>
+
         <!-- Приветствие -->
-        <div class="section greet active" id="greet">
-            <img src="17.png" alt="Приветствие">
+        <div class="greet active" id="greet">
+            <img src="17.png" alt="Приветствие" />
             <button id="startBtn">Пуск</button>
         </div>
 
         <!-- Фраза -->
-        <div class="section final" id="final">
+        <div class="final" id="final">
             <h2>Физмат — это не факультет, это образ жизни</h2>
-            <img src="17a.jpg" alt="Физмат">
+            <img src="17a.jpg" alt="Физмат — образ жизни" />
             <button id="nextBtn">Пуск</button>
         </div>
 
         <!-- Карточки -->
-        <div class="section cards" id="cards">
-            <div class="card" id="cardText">Загрузка...</div>
+        <div class="cards" id="cards">
+            <div class="card" id="cardText"></div>
+
+            <div id="addForm">
+                <textarea id="newText" placeholder="Напиши свой текст..."></textarea>
+                <button id="saveText">Сохранить</button>
+            </div>
+
             <div class="card-nav">
                 <button id="prevCard">Назад</button>
                 <button id="nextCard">Далее</button>
-            </div>
-
-            <div class="add-section">
-                <textarea id="newText" placeholder="Добавьте свой текст..."></textarea><br>
-                <button id="addTextBtn">Добавить</button>
+                <button id="addCard">Добавить свой</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Подключаемся к Supabase
-        const SUPABASE_URL = "https://ajhtpxprvlxgpafopmmd.supabase.co";
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqaHRweHBydmx4Z3BhZm9wbW1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3NjI2NzksImV4cCI6MjA3NzMzODY3OX0.1k0M4u3aOtLTgmmG1d4m5AqBNrsz68RHlrLmkINkfqc";
+        // ======== Фон и частицы ========
+        const canvas = document.getElementById('c');
+        const ctx = canvas.getContext('2d');
+        let W, H, particles = [];
 
-        const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        function resize() {
+            const r = document.getElementById('stage').getBoundingClientRect();
+            W = canvas.width = r.width;
+            H = canvas.height = r.height;
+        }
+        window.addEventListener('resize', () => { resize(); initParticles(); });
 
+        class P {
+            constructor(x, y, r) {
+                this.x = x; this.y = y; this.r = r;
+                this.vx = (Math.random() - 0.5) * 0.6;
+                this.vy = (Math.random() - 0.5) * 0.6;
+            }
+            step() {
+                this.x += this.vx; this.y += this.vy;
+                if (this.x < 0 || this.x > W) this.vx *= -1;
+                if (this.y < 0 || this.y > H) this.vy *= -1;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function initParticles() {
+            particles = [];
+            const n = Math.max(18, Math.floor((W * H) / 42000));
+            for (let i = 0; i < n; i++) {
+                particles.push(new P(Math.random() * W, Math.random() * H, 1 + Math.random() * 2));
+            }
+        }
+
+        function loop() {
+            ctx.clearRect(0, 0, W, H);
+            const g = ctx.createLinearGradient(0, 0, W, H);
+            g.addColorStop(0, 'rgba(96,165,250,0.04)');
+            g.addColorStop(1, 'rgba(99,102,241,0.02)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = 'rgba(255,255,255,0.85)';
+            for (let p of particles) { p.step(); p.draw(); }
+            requestAnimationFrame(loop);
+        }
+        resize(); initParticles(); requestAnimationFrame(loop);
+
+        // ======== Экраны ========
         const greet = document.getElementById('greet');
         const final = document.getElementById('final');
         const cards = document.getElementById('cards');
         const startBtn = document.getElementById('startBtn');
-        const nextBtn = document.getElementById('nextBtn');
 
+        startBtn.addEventListener('click', () => {
+            // плавно скрываем кнопку
+            startBtn.style.opacity = '0';
+            startBtn.style.pointerEvents = 'none';
+            setTimeout(() => {
+                greet.classList.remove('active');
+                setTimeout(() => final.classList.add('active'), 800);
+            }, 500);
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            final.classList.remove('active');
+            setTimeout(() => cards.classList.add('active'), 800);
+        });
+
+        // ======== Карточки ========
+        let texts = [
+            "Афонина С.Н. – Потому что я его закончила, он мне родной. Я выбрала его, потому что очень люблю математику.",
+            "Быкова К.И. – Потому что он наполнен наукой и уютом.",
+            "Каждый проект — маленькое приключение.",
+            "Сорока М.С. – Потому что ФИЗМАТ – это семья.",
+            "Афонин Г.В. – Вопрос, надо сказать, очень глубокий. И, в первую очередь, конечно, я люблю сами направления: физику, математику и всё, что связано с теми дисциплинами, которые изучаются на нашем факультете. Во-вторых, я в своё время стал частью этого факультета и сразу влюбился в него. Вот уже более двадцати лет я связан с ним, люблю наших студентов, наших преподавателей и всё, что связано с нашим факультетом."
+        ];
+
+        const saved = JSON.parse(localStorage.getItem('userTexts') || "[]");
+        texts = texts.concat(saved);
+
+        let current = 0;
         const cardText = document.getElementById('cardText');
         const prevCard = document.getElementById('prevCard');
         const nextCard = document.getElementById('nextCard');
-        const addTextBtn = document.getElementById('addTextBtn');
+        const addCard = document.getElementById('addCard');
+        const addForm = document.getElementById('addForm');
         const newText = document.getElementById('newText');
-
-        let messages = [];
-        let current = 0;
-
-        startBtn.addEventListener('click', () => {
-            startBtn.style.display = "none";
-            greet.classList.remove('active');
-            setTimeout(() => final.classList.add('active'), 800);
-        });
-
-        nextBtn.addEventListener('click', () => {
-            final.classList.remove('active');
-            setTimeout(() => {
-                cards.classList.add('active');
-                loadMessages();
-            }, 800);
-        });
-
-        async function loadMessages() {
-            const { data, error } = await client
-                .from('messages')
-                .select('*')
-                .order('id', { ascending: true });
-
-            if (error) {
-                console.error(error);
-                cardText.textContent = "Ошибка загрузки данных 😢";
-                return;
-            }
-
-            messages = data.map(m => m.text);
-            if (messages.length === 0) {
-                cardText.textContent = "Пока нет сообщений. Добавьте первое!";
-            } else {
-                current = 0;
-                showCard(current);
-            }
-        }
+        const saveText = document.getElementById('saveText');
 
         function showCard(i) {
-            cardText.textContent = messages[i] || "Пока нет сообщений.";
+            cardText.style.opacity = 0;
+            setTimeout(() => {
+                cardText.textContent = texts[i];
+                cardText.style.opacity = 1;
+            }, 200);
         }
 
         prevCard.addEventListener('click', () => {
-            if (current > 0) {
-                current--;
-                showCard(current);
-            }
+            if (current > 0) { current--; showCard(current); }
         });
 
         nextCard.addEventListener('click', () => {
-            if (current < messages.length - 1) {
-                current++;
+            if (current < texts.length - 1) {
+                current++; showCard(current);
+            } else {
+                addForm.style.display = 'flex';
+            }
+        });
+
+        addCard.addEventListener('click', () => {
+            addForm.style.display = 'flex';
+            newText.focus();
+        });
+
+        saveText.addEventListener('click', () => {
+            const txt = newText.value.trim();
+            if (txt) {
+                texts.push(txt);
+                let savedTexts = JSON.parse(localStorage.getItem('userTexts') || "[]");
+                savedTexts.push(txt);
+                localStorage.setItem('userTexts', JSON.stringify(savedTexts));
+
+                newText.value = "";
+                addForm.style.display = 'none'; // окно закрывается
+                current = texts.length - 1;
                 showCard(current);
             }
         });
 
-        addTextBtn.addEventListener('click', async () => {
-            const text = newText.value.trim();
-            if (!text) return;
-
-            const { error } = await client.from('messages').insert([{ text }]);
-            if (error) {
-                alert("Ошибка добавления текста");
-                console.error(error);
-                return;
-            }
-
-            newText.value = "";
-            await loadMessages();
-            current = messages.length - 1;
-            showCard(current);
-        });
+        showCard(current);
     </script>
 </body>
 
